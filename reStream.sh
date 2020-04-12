@@ -52,37 +52,8 @@ ssh_cmd() {
     ssh -o ConnectTimeout=1 "$ssh_host" "$@"
 }
 
-# check if we are able to reach the remarkable
-if ! ssh_cmd true; then
-    echo "$ssh_host unreachable"
-    exit 1
-fi
-
-fallback_to_gzip() {
-    echo "Falling back to gzip, your experience may not be optimal."
-    echo "Go to https://github.com/rien/reStream/#sub-second-latency for a better experience."
-    compress="gzip"
-    decompress="gzip -d"
-    sleep 2
-}
-
-# check if lz4 is present on remarkable
-if ssh_cmd "[ -f /opt/bin/lz4 ]"; then
-    compress="/opt/bin/lz4"
-elif ssh_cmd "[ -f ~/lz4 ]"; then
-    compress="\$HOME/lz4"
-fi
-
-# gracefully degrade to gzip if is not present on remarkable or host
-if [ -z "$compress" ]; then
-    echo "Your remarkable does not have lz4."
-    fallback_to_gzip
-elif ! lz4 -V; then
-    echo "Your host does not have lz4."
-    fallback_to_gzip
-else
-    decompress="lz4 -d"
-fi
+compress="\$HOME/lz4"
+decompress="lz4 -d"
 
 # list of ffmpeg filters to apply
 video_filters=""
@@ -131,4 +102,6 @@ ssh_cmd "$read_loop" \
         -pixel_format gray16le \
         -video_size "$width,$height" \
         -i - \
+	-f v4l2 \
+	-pix_fmt yuyv422 \
         "$@"
