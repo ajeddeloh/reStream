@@ -74,7 +74,7 @@ video_filters="$video_filters,setpts=(RTCTIME - RTCSTART) / (TB * 1000000)"
 head_fb0="dd if=/dev/fb0 count=1 bs=$window_bytes 2>/dev/null"
 
 # loop that keeps on reading and compressing, to be executed remotely
-read_loop="while $head_fb0; do $loop_wait; done | $compress"
+read_loop="while $head_fb0; do $loop_wait; done | $compress | nc 10.11.99.2 5556"
 
 set -- "$@" -vf "${video_filters#,}"
 
@@ -93,7 +93,7 @@ fi
 set -e # stop if an error occurs
 
 # shellcheck disable=SC2086
-ssh_cmd "$read_loop" \
+nc -l -p 5556 \
     | $decompress \
     | "$output_cmd" \
         -vcodec rawvideo \
@@ -101,7 +101,10 @@ ssh_cmd "$read_loop" \
         -f rawvideo \
         -pixel_format gray16le \
         -video_size "$width,$height" \
+	-framerate 60 \
         -i - \
 	-f v4l2 \
 	-pix_fmt yuyv422 \
-        "$@"
+        "$@" &
+
+ssh_cmd "$read_loop"
